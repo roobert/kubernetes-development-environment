@@ -276,7 +276,9 @@ function pod_connect() {
 	echo
 	echo "==> connecting to pod"
 
-	kubectl exec -it --namespace="${KDEV_NAME}" "${KDEV_NAME}" -- /bin/bash
+	KDEV_SHELL="${KDEV_SHELL:-/bin/bash}"
+
+	kubectl exec -it --namespace="${KDEV_NAME}" "${KDEV_NAME}" -- "${KDEV_SHELL}"
 
 	echo
 	echo "==> disconnected from pod"
