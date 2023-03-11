@@ -2,14 +2,20 @@
 
 set -euo pipefail
 
-USER=$(whoami)
+# * creating a bucket should be optional
+# * support AWS buckets?
+# * permit creating dev-env inside an existing namespace, or create a new one with
+#   optional custom service account and permissions
+# * targets should include: setup, connect, destroy
+
+USER="rw"
 
 set +u
 PROFILE="${1}"
 set -u
 
-KDEV_NAME="kde-${USER}-${PROFILE}"
-NAMESPACE="${KDEV_NAME}"
+KDE_NAME="kde-${USER}-${PROFILE}"
+NAMESPACE="${KDE_NAME}"
 
 function main() {
 	if [[ $# -eq 0 ]]; then
@@ -69,7 +75,7 @@ function fast_connect_if_pod_exists() {
 	echo "==> checking if pod exists"
 
 	set +e
-	POD_READY=$(kubectl get pods --namespace="${KDEV_NAME}" "${KDEV_NAME}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null)
+	POD_READY=$(kubectl get pods --namespace="${KDE_NAME}" "${KDE_NAME}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null)
 	set -e
 
 	if [ "${POD_READY}" == "true" ]; then
@@ -127,8 +133,8 @@ function bucket_create() {
 	set -u
 
 	# create a bucket to store our data in
-	if ! gsutil ls -p "${BUCKET_PROJECT}" "gs://${KDEV_NAME}" 2>/dev/null; then
-		gsutil mb -p "${BUCKET_PROJECT}" -c regional -l "${BUCKET_LOCATION}" "gs://${KDEV_NAME}"
+	if ! gsutil ls -p "${BUCKET_PROJECT}" "gs://${KDE_NAME}" 2>/dev/null; then
+		gsutil mb -p "${BUCKET_PROJECT}" -c regional -l "${BUCKET_LOCATION}" "gs://${KDE_NAME}"
 	else
 		echo "bucket already exists.."
 	fi
@@ -137,38 +143,38 @@ function bucket_create() {
 function bucket_mount() {
 	echo
 	echo "==> mounting bucket"
-	#kubectl exec -it --namespace="${KDEV_NAME}" "${KDEV_NAME}" -- \
-	#	gcsfuse --implicit-dirs "${KDEV_NAME}" "/mnt/${KDEV_NAME}"
-	kubectl exec -it --namespace="${KDEV_NAME}" "${KDEV_NAME}" -- \
-		gcsfuse --implicit-dirs "${KDEV_NAME}" "/mnt/${KDEV_NAME}"
+	#kubectl exec -it --namespace="${KDE_NAME}" "${KDE_NAME}" -- \
+	#	gcsfuse --implicit-dirs "${KDE_NAME}" "/mnt/${KDE_NAME}"
+	kubectl exec -it --namespace="${KDE_NAME}" "${KDE_NAME}" -- \
+		gcsfuse --implicit-dirs "${KDE_NAME}" "/mnt/${KDE_NAME}"
 }
 
 function bucket_destroy() {
 	echo
 	echo "==> deleting bucket"
 	set +e
-	gsutil rm -r "gs://${KDEV_NAME}"
+	gsutil rm -r "gs://${KDE_NAME}"
 	set -e
 }
 
-# update manifests with KDEV_NAME..
+# update manifests with KDE_NAME..
 function manifests_template() {
 	echo
 	echo "==> templating manifests"
-	mkdir -p "./tmp/${KDEV_NAME}"
+	mkdir -p "./tmp/${KDE_NAME}"
 
 	for manifest in ./profiles/"${PROFILE}"/manifests/*.yaml; do
 		echo
 		echo "processing: ${manifest}"
 		FILENAME=$(basename "${manifest}")
-		sed "s/KDEV_NAME/${KDEV_NAME}/g;s/NAMESPACE/${NAMESPACE}/g" "${manifest}" >"./tmp/${KDEV_NAME}/${FILENAME}"
+		sed "s/KDE_NAME/${KDE_NAME}/g;s/NAMESPACE/${NAMESPACE}/g" "${manifest}" >"./tmp/${KDE_NAME}/${FILENAME}"
 	done
 }
 
 function manifests_apply() {
 	echo
 	echo "==> applying manifests"
-	for manifest in "./tmp/${KDEV_NAME}"/*.yaml; do
+	for manifest in "./tmp/${KDE_NAME}"/*.yaml; do
 		echo
 		echo "processing: ${manifest}"
 		kubectl apply -f "${manifest}"
@@ -179,16 +185,16 @@ function manifests_destroy() {
 	echo
 	echo "==> destroying manifests"
 
-	mkdir -p "./tmp/${KDEV_NAME}"
+	mkdir -p "./tmp/${KDE_NAME}"
 
 	for manifest in ./profiles/"${PROFILE}"/manifests/*.yaml; do
 		echo
 		echo "processing: ${manifest}"
 		FILENAME=$(basename "${manifest}")
-		sed "s/KDEV_NAME/${KDEV_NAME}/g;s/NAMESPACE/${NAMESPACE}/g" "${manifest}" >"./tmp/${KDEV_NAME}/${FILENAME}"
+		sed "s/KDE_NAME/${KDE_NAME}/g;s/NAMESPACE/${NAMESPACE}/g" "${manifest}" >"./tmp/${KDE_NAME}/${FILENAME}"
 	done
 
-	for manifest in $(ls -r ./tmp/"${KDEV_NAME}"/*.yaml); do
+	for manifest in $(ls -r ./tmp/"${KDE_NAME}"/*.yaml); do
 		echo
 		echo "processing: ${manifest}"
 		set +e
@@ -197,7 +203,7 @@ function manifests_destroy() {
 	done
 
 	# echo "removing temporary files.."
-	# rm -vrf "./tmp/${KDEV_NAME}"
+	# rm -vrf "./tmp/${KDE_NAME}"
 }
 
 # create a container and run post-init shell if it doesn't already exist
@@ -206,28 +212,28 @@ function pod_create() {
 	echo "==> creating pod"
 
 	set +e
-	POD_READY=$(kubectl get pods --namespace="${KDEV_NAME}" "${KDEV_NAME}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null)
+	POD_READY=$(kubectl get pods --namespace="${KDE_NAME}" "${KDE_NAME}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null)
 	set -e
 
-	# permit overriding default image
-	KDEV_IMAGE="${KDEV_IMAGE:-ubuntu}"
+	# permit overriding the container image..
+	KDEV_IMAGE=${KDEV_IMAGE:-"ubuntu"}
 
 	if [ "${POD_READY}" != "true" ]; then
 		if ! test -f "./profiles/${PROFILE}/init.sh"; then
 			kubectl run \
 				-i \
-				--namespace="${KDEV_NAME}" \
-				--overrides='{ "spec": { "serviceAccount": "'"${KDEV_NAME}"'" } }' \
+				--namespace="${KDE_NAME}" \
+				--overrides='{ "spec": { "serviceAccount": "'"${KDE_NAME}"'" } }' \
 				--image "${KDEV_IMAGE}" \
-				"${KDEV_NAME}" \
+				"${KDE_NAME}" \
 				-- /bin/bash
 		else
 			kubectl run \
 				-i \
-				--namespace="${KDEV_NAME}" \
-				--overrides='{ "spec": { "serviceAccount": "'"${KDEV_NAME}"'" } }' \
+				--namespace="${KDE_NAME}" \
+				--overrides='{ "spec": { "serviceAccount": "'"${KDE_NAME}"'" } }' \
 				--image "${KDEV_IMAGE}" \
-				"${KDEV_NAME}" \
+				"${KDE_NAME}" \
 				-- /bin/bash <./profiles/${PROFILE}/init.sh
 		fi
 	else
@@ -242,7 +248,7 @@ function pod_connect() {
 	# wait for pod to be ready otherwise errors can occur
 	sleep 1
 
-	kubectl exec -it --namespace="${KDEV_NAME}" "${KDEV_NAME}" -- /bin/bash
+	kubectl exec -it --namespace="${KDE_NAME}" "${KDE_NAME}" -- /bin/bash
 
 	echo
 	echo "==> disconnected from pod"
@@ -253,7 +259,7 @@ function pod_destroy() {
 	echo
 	echo "==> destroying pod"
 	set +e
-	kubectl delete pod --namespace="${KDEV_NAME}" "${KDEV_NAME}"
+	kubectl delete pod --namespace="${KDE_NAME}" "${KDE_NAME}"
 	set -e
 }
 
