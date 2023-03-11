@@ -165,6 +165,7 @@ function bucket_iam_destroy() {
 	echo
 	echo "==> destroying bucket IAM"
 
+	set +e
 	# FIXME: check state
 	gcloud projects remove-iam-policy-binding \
 		"${KDEV_BUCKET_PROJECT}" \
@@ -177,6 +178,7 @@ function bucket_iam_destroy() {
 		"${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com" \
 		--project="${KDEV_BUCKET_PROJECT}" \
 		--quiet
+	set -e
 }
 
 function bucket_mount() {
@@ -206,7 +208,7 @@ function manifests_template() {
 		echo
 		echo "templating: ${manifest}"
 		FILENAME=$(basename "${manifest}")
-		sed "s/KDEV_NAME/${KDEV_NAME}/g;s/KDEV_NAMESPACE/${KDEV_NAMESPACE}/g" "${manifest}" >"./tmp/${KDEV_NAME}/${FILENAME}"
+		sed "s/KDEV_NAMESPACE/${KDEV_NAMESPACE}/g;s/KDEV_NAME/${KDEV_NAME}/g" "${manifest}" >"./tmp/${KDEV_NAME}/${FILENAME}"
 	done
 }
 
@@ -233,7 +235,7 @@ function manifests_destroy() {
 		echo
 		echo "templating: ${manifest}"
 		FILENAME=$(basename "${manifest}")
-		sed "s/KDEV_NAME/${KDEV_NAME}/g;s/KDEV_NAMESPACE/${KDEV_NAMESPACE}/g" "${manifest}" >"./tmp/${KDEV_NAME}/${FILENAME}"
+		sed "s/KDEV_NAMESPACE/${KDEV_NAMESPACE}/g;s/KDEV_NAME/${KDEV_NAME}/g" "${manifest}" >"./tmp/${KDEV_NAME}/${FILENAME}"
 	done
 
 	for manifest in $(ls -r ./tmp/"${KDEV_NAME}"/*.yaml); do
