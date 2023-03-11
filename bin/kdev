@@ -23,7 +23,7 @@ function main() {
 		echo
 		echo "profiles:"
 		echo
-		for profile in ./profiles/*; do
+		for profile in "${PROFILES_DIR}"/*; do
 			echo "  $(basename "${profile}")"
 		done
 		echo
@@ -69,7 +69,6 @@ function main() {
 		exit
 		;;
 
-	# FIXME: warn about deleting data!
 	destroy-data)
 		bucket_destroy
 		;;
@@ -228,6 +227,7 @@ function bucket_destroy() {
 	fi
 	set -u
 
+	# FIXME: warn about deleting data!
 	echo
 	echo "==> deleting bucket"
 	set +e
