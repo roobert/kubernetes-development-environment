@@ -23,9 +23,9 @@ function main() {
 		echo
 		echo "commands:"
 		echo
-		echo "  setup   - configure but don't connect"
-		echo "  connect - setup (if required) and connect (default command if none specified)"
-		echo "  destroy - destroy all resources relating to the profile, apart from data bucket"
+		echo "  setup        - configure but don't connect"
+		echo "  connect      - setup (if required) and connect (default command if none specified)"
+		echo "  destroy      - destroy all resources relating to the profile, apart from data bucket"
 		echo "  destroy-data - destroy the data bucket and all data!"
 		echo
 		exit 1
