@@ -19,7 +19,7 @@ apt-get -y install gcsfuse google-cloud-sdk software-properties-common git
 # Install Neovim
 add-apt-repository -y ppa:neovim-ppa/unstable
 apt-get update
-apt-get -y install neovim unzip
+apt-get -y install neovim unzip zsh
 
 cd /root
 
@@ -32,9 +32,6 @@ bash lunarvim-install.sh -y
 rm lunarvim-install.sh
 
 # Install my dotfiles
-curl https://github.com/roobert/dotfiles/archive/refs/heads/master.zip -Lo master.zip
-unzip master.zip
-cp -R dotfiles-master/{.,}* /root/
-rm -rf dotfiles-master master.zip
-
-echo "export PATH=/root/.local/bin:$PATH" >>.bashrc
+curl https://github.com/roobert/dotfiles/archive/refs/heads/master.zip -Lo dotfiles.zip
+unzip -j dotfiles.zip
+rm -rf master.zip
