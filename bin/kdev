@@ -269,6 +269,7 @@ function manifests_destroy() {
 		sed "s/KDEV_NAMESPACE/${KDEV_NAMESPACE}/g;s/KDEV_NAME/${KDEV_NAME}/g" "${manifest}" >"./tmp/${KDEV_NAME}/${FILENAME}"
 	done
 
+	# NOTE: reversed list
 	for manifest in $(ls -r ./tmp/"${KDEV_NAME}"/*.yaml); do
 		echo
 		echo "processing: ${manifest}"
