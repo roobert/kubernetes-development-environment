@@ -1,3 +1,3 @@
-BUCKET_TYPE="gcp"
-BUCKET_PROJECT="example-bucket"
-BUCKET_LOCATION="europe-west2"
+KDEV_BUCKET_TYPE="gcp"
+KDEV_BUCKET_PROJECT="example-bucket"
+KDEV_BUCKET_LOCATION="europe-west2"
