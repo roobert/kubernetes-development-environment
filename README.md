@@ -2,6 +2,20 @@
 
 Ever wish you had a development environment within a cluster with persistent storage? Say hello to kdev!
 
+## Usage
+
+```
+# Install
+mkdir -p "${HOME}/opt"
+curl git@github.com:roobert/kubernetes-development-environment.git -o kdev.zip
+unzip kdev.zip -d "${HOME}/opt"
+
+# Add to path
+export PATH="$PATH:$HOME/opt/kubernetes-development-environment/bin"
+
+kdev help
+```
+
 ## About
 
 * **Customizable environment**

@@ -19,22 +19,7 @@ MANIFEST_DIR="${ROOT_DIR}/tmp/${KDEV_NAME}"
 
 function main() {
 	if [[ $# -ne 2 ]]; then
-		echo "usage: $0 <profile> <command>"
-		echo
-		echo "profiles:"
-		echo
-		for profile in "${PROFILES_DIR}"/*; do
-			echo "  $(basename "${profile}")"
-		done
-		echo
-		echo "commands:"
-		echo
-		echo "  setup        - configure but don't connect"
-		echo "  connect      - setup (if required) and connect (default command if none specified)"
-		echo "  destroy      - destroy all resources relating to the profile, apart from data bucket"
-		echo "  destroy-data - destroy the data bucket and all data!"
-		echo
-		exit 1
+		usage
 	fi
 
 	profile_check
@@ -72,11 +57,42 @@ function main() {
 	destroy-data)
 		bucket_destroy
 		;;
+
+	help)
+		usage
+		;;
+
 	*)
 		echo "Error: unknown command: $2"
 		exit 1
 		;;
 	esac
+}
+
+function usage() {
+	echo
+	echo "  kdev - kubernetes development environment"
+	echo
+	echo "usage:"
+	echo
+	echo "  $(basename "$0") <profile> <command>"
+	echo
+	echo "profiles:"
+	echo
+	for profile in "${PROFILES_DIR}"/*; do
+		echo "  $(basename "${profile}")"
+	done
+	echo
+	echo "commands:"
+	echo
+	echo "  setup        - configure but don't connect"
+	echo "  connect      - setup (if required) and connect (default command if none specified)"
+	echo "  destroy      - destroy all resources relating to the profile, apart from data bucket"
+	echo "  destroy-data - destroy the data bucket and all data!"
+	echo
+	echo "  help         - show this help"
+	echo
+	exit 1
 }
 
 function pod_fast_connect_if_exists() {
