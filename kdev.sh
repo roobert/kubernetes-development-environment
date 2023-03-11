@@ -204,7 +204,7 @@ function manifests_template() {
 
 	for manifest in ./profiles/"${PROFILE}"/manifests/*.yaml; do
 		echo
-		echo "processing: ${manifest}"
+		echo "templating: ${manifest}"
 		FILENAME=$(basename "${manifest}")
 		sed "s/KDEV_NAME/${KDEV_NAME}/g;s/NAMESPACE/${NAMESPACE}/g" "${manifest}" >"./tmp/${KDEV_NAME}/${FILENAME}"
 	done
@@ -231,7 +231,7 @@ function manifests_destroy() {
 
 	for manifest in ./profiles/"${PROFILE}"/manifests/*.yaml; do
 		echo
-		echo "processing: ${manifest}"
+		echo "templating: ${manifest}"
 		FILENAME=$(basename "${manifest}")
 		sed "s/KDEV_NAME/${KDEV_NAME}/g;s/NAMESPACE/${NAMESPACE}/g" "${manifest}" >"./tmp/${KDEV_NAME}/${FILENAME}"
 	done
