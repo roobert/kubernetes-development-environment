@@ -1,4 +1,4 @@
-# kdev - The Kubernetes Development Environment
+# `kdev` - A Kubernetes Development Environment
 
 Ever wish you had a development environment within a cluster with persistent storage? Say hello to kdev!
 
