@@ -26,6 +26,9 @@ function main() {
 	profile_read
 
 	case $2 in
+	list)
+		list
+		;;
 	setup)
 		pre_hook
 		bucket_create
@@ -93,6 +96,11 @@ function usage() {
 	echo "  help         - show this help"
 	echo
 	exit 1
+}
+
+function list() {
+	echo "==> listing kdev namespaces"
+	kubectl get namespaces | awk '{ print $1 }' | grep -E '^kdev-*'
 }
 
 function pod_fast_connect_if_exists() {
@@ -315,14 +323,13 @@ function pod_init() {
 	if [[ "${POD_READY}" != true ]]; then
 		echo "Error: pod not ready"
 		exit 1
-	else
-		if test -f "${PROFILE_DIR}/init.sh"; then
-			kubectl exec \
-				-i \
-				--namespace="${KDEV_NAME}" \
-				"${KDEV_NAME}" \
-				-- /bin/bash <"${PROFILE_DIR}"/init.sh
-		fi
+	fi
+
+	if test -f "${PROFILE_DIR}/init.sh"; then
+		kubectl exec \
+			-i \
+			--namespace="${KDEV_NAME}" \
+			"${KDEV_NAME}" -- /bin/bash <"${PROFILE_DIR}/init.sh"
 	fi
 }
 
