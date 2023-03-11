@@ -27,7 +27,9 @@ cd /root
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "${HOME}/.cargo/env"
 
-bash <(curl -s https://raw.githubusercontent.com/lunarvim/lunarvim/master/utils/installer/install.sh)
+curl -s https://raw.githubusercontent.com/lunarvim/lunarvim/master/utils/installer/install.sh -o lunarvim-install.sh
+bash lunarvim-install.sh -y
+rm lunarvim-install.sh
 
 # Install my dotfiles
 curl https://github.com/roobert/dotfiles/archive/refs/heads/master.zip -Lo master.zip
