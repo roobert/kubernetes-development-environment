@@ -38,10 +38,8 @@ function main() {
 	set +u
 	if [[ $2 == "destroy" ]]; then
 		set -u
-		echo
-		echo "==> destroying resources"
-		manifests_destroy
 		bucket_iam_destroy
+		manifests_destroy
 		exit
 	fi
 	set -u
@@ -170,13 +168,15 @@ function bucket_iam_destroy() {
 	# FIXME: check state
 	gcloud projects remove-iam-policy-binding \
 		"${BUCKET_PROJECT}" \
+		--project="${BUCKET_PROJECT}" \
 		--member="serviceAccount:${KDEV_NAME}@${BUCKET_PROJECT}.iam.gserviceaccount.com" \
-		--role='roles/storage.Admin'
+		--role='roles/storage.admin'
 
 	# FIXME: check if already exists
 	gcloud iam service-accounts delete \
 		"${KDEV_NAME}@${BUCKET_PROJECT}.iam.gserviceaccount.com" \
-		--project="${BUCKET_PROJECT}"
+		--project="${BUCKET_PROJECT}" \
+		--quiet
 }
 
 function bucket_mount() {
