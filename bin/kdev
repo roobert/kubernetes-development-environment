@@ -18,18 +18,25 @@ KDEV_NAMESPACE="${KDEV_NAME}"
 MANIFEST_DIR="${ROOT_DIR}/tmp/${KDEV_NAME}"
 
 function main() {
+	if [[ $# -eq 1 ]]; then
+		case $1 in
+		list)
+			list
+			;;
+		help)
+			usage
+			;;
+		esac
+	fi
+
 	if [[ $# -ne 2 ]]; then
 		usage
 	fi
 
-	profile_check
-	profile_read
-
 	case $2 in
-	list)
-		list
-		;;
 	setup)
+		profile_check
+		profile_read
 		pre_hook
 		bucket_create
 		manifests_template
@@ -40,6 +47,8 @@ function main() {
 		;;
 
 	connect)
+		profile_check
+		profile_read
 		pod_fast_connect_if_exists
 		pre_hook
 		bucket_create
@@ -52,17 +61,17 @@ function main() {
 		;;
 
 	destroy)
+		profile_check
+		profile_read
 		bucket_iam_destroy
 		manifests_destroy
 		exit
 		;;
 
 	destroy-data)
+		profile_check
+		profile_read
 		bucket_destroy
-		;;
-
-	help)
-		usage
 		;;
 
 	*)
@@ -101,6 +110,7 @@ function usage() {
 function list() {
 	echo "==> listing kdev namespaces"
 	kubectl get namespaces | awk '{ print $1 }' | grep -E '^kdev-*'
+	exit
 }
 
 function pod_fast_connect_if_exists() {
