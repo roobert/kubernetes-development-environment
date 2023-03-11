@@ -32,5 +32,7 @@ bash <(curl -s https://raw.githubusercontent.com/lunarvim/lunarvim/master/utils/
 # Install my dotfiles
 curl https://github.com/roobert/dotfiles/archive/refs/heads/master.zip -Lo master.zip
 unzip master.zip
-mv dotfiles-master/.* .
+cp -R dotfiles-master/{.,}* /root/
 rm -rf dotfiles-master master.zip
+
+echo "export PATH=/root/.local/bin:$PATH" >>.bashrc
