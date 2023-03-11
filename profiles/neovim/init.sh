@@ -33,5 +33,10 @@ rm lunarvim-install.sh
 
 # Install my dotfiles
 curl https://github.com/roobert/dotfiles/archive/refs/heads/master.zip -Lo dotfiles.zip
-unzip -j dotfiles.zip
-rm -rf master.zip
+unzip dotfiles.zip
+
+shopt -s dotglob
+cp -R dotfiles-master/* /root/
+shopt -u dotglob
+
+rm -rf dotfiles.zip dotfiles-master
