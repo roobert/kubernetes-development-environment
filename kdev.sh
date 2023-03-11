@@ -8,7 +8,7 @@ set +u
 PROFILE="${1}"
 set -u
 
-KDEV_NAME="kde-${USER}-${PROFILE}"
+KDEV_NAME="kdev-${USER}-${PROFILE}"
 NAMESPACE="${KDEV_NAME}"
 
 function main() {
@@ -61,6 +61,7 @@ function main() {
 	manifests_template
 	manifests_apply
 	pod_create
+	pod_init
 	bucket_mount
 	pod_connect
 }
@@ -72,7 +73,7 @@ function fast_connect_if_pod_exists() {
 	POD_READY=$(kubectl get pods --namespace="${KDEV_NAME}" "${KDEV_NAME}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null)
 	set -e
 
-	if [ "${POD_READY}" == "true" ]; then
+	if [[ "${POD_READY}" == true ]]; then
 		pod_connect
 		exit
 	fi
@@ -195,12 +196,9 @@ function manifests_destroy() {
 		kubectl delete -f "${manifest}"
 		set -e
 	done
-
-	# echo "removing temporary files.."
-	# rm -vrf "./tmp/${KDEV_NAME}"
 }
 
-# create a container and run post-init shell if it doesn't already exist
+# create a container if it doesn't exist
 function pod_create() {
 	echo
 	echo "==> creating pod"
@@ -212,35 +210,58 @@ function pod_create() {
 	# permit overriding default image
 	KDEV_IMAGE="${KDEV_IMAGE:-ubuntu}"
 
-	if [ "${POD_READY}" != "true" ]; then
-		if ! test -f "./profiles/${PROFILE}/init.sh"; then
-			kubectl run \
-				-i \
-				--namespace="${KDEV_NAME}" \
-				--overrides='{ "spec": { "serviceAccount": "'"${KDEV_NAME}"'" } }' \
-				--image "${KDEV_IMAGE}" \
-				"${KDEV_NAME}" \
-				-- /bin/bash
-		else
-			kubectl run \
-				-i \
-				--namespace="${KDEV_NAME}" \
-				--overrides='{ "spec": { "serviceAccount": "'"${KDEV_NAME}"'" } }' \
-				--image "${KDEV_IMAGE}" \
-				"${KDEV_NAME}" \
-				-- /bin/bash <./profiles/${PROFILE}/init.sh
-		fi
+	if [[ "${POD_READY}" != true ]]; then
+		kubectl run \
+			--namespace="${KDEV_NAME}" \
+			--overrides='{ "spec": { "serviceAccount": "'"${KDEV_NAME}"'" } }' \
+			--image "${KDEV_IMAGE}" \
+			"${KDEV_NAME}" \
+			-- /bin/bash -c "tail -f /dev/null"
+
+		# FIXME: max wait 5 seconds?
+		echo -n "Waiting for pod to be ready.."
+		POD_READY=false
+		while [[ "${POD_READY}" != true ]]; do
+			echo -n "."
+			sleep 1
+			set +e
+			POD_READY=$(kubectl get pods --namespace="${KDEV_NAME}" "${KDEV_NAME}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null)
+			set -e
+		done
+		echo
 	else
 		echo "pod already exists.."
+	fi
+}
+
+function pod_init() {
+	echo
+	echo "==> initialize pod"
+
+	set +e
+	POD_READY=$(kubectl get pods --namespace="${KDEV_NAME}" "${KDEV_NAME}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null)
+	set -e
+
+	# permit overriding default image
+	KDEV_IMAGE="${KDEV_IMAGE:-ubuntu}"
+
+	if [[ "${POD_READY}" != true ]]; then
+		echo "Error: pod not ready"
+		exit 1
+	else
+		if test -f "./profiles/${PROFILE}/init.sh"; then
+			kubectl exec \
+				-i \
+				--namespace="${KDEV_NAME}" \
+				"${KDEV_NAME}" \
+				-- /bin/bash <./profiles/"${PROFILE}"/init.sh
+		fi
 	fi
 }
 
 function pod_connect() {
 	echo
 	echo "==> connecting to pod"
-
-	# wait for pod to be ready otherwise errors can occur
-	sleep 1
 
 	kubectl exec -it --namespace="${KDEV_NAME}" "${KDEV_NAME}" -- /bin/bash
 
