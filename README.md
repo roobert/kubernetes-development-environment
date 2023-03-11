@@ -15,3 +15,4 @@ Ever wish you had a development environment within a cluster with persistent sto
     * Avoid losing state when you lose connection! Save any state to `/mnt/<profile-name>` and continue you where you left off
 * **Clean-up** after yourself
     * The `destroy` command(s) can be used to reset the state of your remote cluster once you've finished a task
+* **Portable** - written in pure bash!
