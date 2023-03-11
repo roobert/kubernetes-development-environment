@@ -31,12 +31,16 @@ function main() {
 		exit 1
 	fi
 
+	profile_check
+	profile_read
+
 	# FIXME: warn about deleting data!
 	set +u
 	if [[ $2 == "destroy" ]]; then
 		set -u
 		echo "==> destroying resources"
 		pod_destroy
+		bucket_iam_destroy
 		manifests_destroy
 		exit
 	fi
@@ -51,22 +55,21 @@ function main() {
 	fi
 	set -u
 
-	check_profile
+	pod_fast_connect_if_exists
 
-	fast_connect_if_pod_exists
-
-	read_profile_config
 	pre_hook
 	bucket_create
 	manifests_template
 	manifests_apply
+	bucket_iam_create
 	pod_create
 	pod_init
 	bucket_mount
 	pod_connect
 }
 
-function fast_connect_if_pod_exists() {
+function pod_fast_connect_if_exists() {
+	echo
 	echo "==> checking if pod exists"
 
 	set +e
@@ -86,15 +89,14 @@ function pre_hook() {
 	fi
 }
 
-function check_profile() {
+function profile_check() {
 	if ! test -d "./profiles/${PROFILE}"; then
 		echo "Error: profile not found: ./profiles/${PROFILE}"
 		exit 1
 	fi
 }
 
-function read_profile_config() {
-	echo
+function profile_read() {
 	echo "==> reading profile config"
 	source "./profiles/${PROFILE}/config.sh"
 }
@@ -135,13 +137,51 @@ function bucket_create() {
 	fi
 }
 
+function bucket_iam_create() {
+	echo
+	echo "==> setting up bucket IAM"
+
+	# FIXME: check if already exists
+	gcloud iam service-accounts create "${KDEV_NAME}" \
+		--project="${BUCKET_PROJECT}"
+
+	# FIXME: check if already exists
+	gcloud projects add-iam-policy-binding "${BUCKET_PROJECT}" \
+		--project "${BUCKET_PROJECT}" \
+		--member "serviceAccount:${KDEV_NAME}@${BUCKET_PROJECT}.iam.gserviceaccount.com" \
+		--role "roles/storage.admin"
+
+	# FIXME: check if already exists
+	gcloud iam service-accounts add-iam-policy-binding \
+		--project "${BUCKET_PROJECT}" \
+		"${KDEV_NAME}@${BUCKET_PROJECT}.iam.gserviceaccount.com" \
+		--role roles/iam.workloadIdentityUser \
+		--member "serviceAccount:${BUCKET_PROJECT}.svc.id.goog[${NAMESPACE}/${KDEV_NAME}]"
+
+	# FIXME: check if already exists
+	kubectl annotate serviceaccount "${KDEV_NAME}" \
+		--namespace "${NAMESPACE}" \
+		"iam.gke.io/gcp-service-account=${KDEV_NAME}@${BUCKET_PROJECT}.iam.gserviceaccount.com"
+}
+
+function bucket_iam_destroy() {
+	echo
+	echo "==> destroying bucket IAM"
+
+	# FIXME: check if already exists
+	gcloud iam service-accounts delete \
+		"${KDEV_NAME}@${BUCKET_PROJECT}.iam.gserviceaccount.com" \
+		--project="${BUCKET_PROJECT}" \
+		--quiet
+}
+
 function bucket_mount() {
 	echo
 	echo "==> mounting bucket"
 	#kubectl exec -it --namespace="${KDEV_NAME}" "${KDEV_NAME}" -- \
 	#	gcsfuse --implicit-dirs "${KDEV_NAME}" "/mnt/${KDEV_NAME}"
 	kubectl exec -it --namespace="${KDEV_NAME}" "${KDEV_NAME}" -- \
-		gcsfuse --implicit-dirs "${KDEV_NAME}" "/mnt/${KDEV_NAME}"
+		/bin/bash -c "mkdir -p /mnt/${KDEV_NAME} && gcsfuse --implicit-dirs ${KDEV_NAME} /mnt/${KDEV_NAME}"
 }
 
 function bucket_destroy() {
@@ -211,9 +251,10 @@ function pod_create() {
 	KDEV_IMAGE="${KDEV_IMAGE:-ubuntu}"
 
 	if [[ "${POD_READY}" != true ]]; then
+		# overrides required to allow service account use and by gcsfuse
 		kubectl run \
 			--namespace="${KDEV_NAME}" \
-			--overrides='{ "spec": { "serviceAccount": "'"${KDEV_NAME}"'" } }' \
+			--overrides='{ "spec": { "template": {"spec": {"containers": [{"securityContext": {"privileged": true, "capabilities": {"add": ["SYS_ADMIN", "SYS_MODULE"]}}}]}}, "serviceAccount": "'"${KDEV_NAME}"'"}}' \
 			--image "${KDEV_IMAGE}" \
 			"${KDEV_NAME}" \
 			-- /bin/bash -c "tail -f /dev/null"
