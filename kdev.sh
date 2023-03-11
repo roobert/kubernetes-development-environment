@@ -99,16 +99,14 @@ function profile_read() {
 }
 
 function bucket_create() {
-	echo
-	echo "==> creating bucket"
-
 	set +u
 	if [[ -z "${KDEV_BUCKET_TYPE}" ]]; then
-		echo "KDEV_BUCKET_TYPE not set, skipping bucket creation"
-		set -u
 		return
 	fi
+	set -u
 
+	echo
+	echo "==> creating bucket"
 	if [[ "${KDEV_BUCKET_TYPE}" == "aws" ]] || [[ "${KDEV_BUCKET_TYPE}" == "AWS" ]]; then
 		echo "KDEV_BUCKET_TYPE: ${KDEV_BUCKET_TYPE} not yet supported"
 		set -u
@@ -135,6 +133,12 @@ function bucket_create() {
 }
 
 function bucket_iam_create() {
+	set +u
+	if [[ -z "${KDEV_BUCKET_TYPE}" ]]; then
+		return
+	fi
+	set -u
+
 	echo
 	echo "==> setting up bucket IAM"
 
@@ -162,6 +166,12 @@ function bucket_iam_create() {
 }
 
 function bucket_iam_destroy() {
+	set +u
+	if [[ -z "${KDEV_BUCKET_TYPE}" ]]; then
+		return
+	fi
+	set -u
+
 	echo
 	echo "==> destroying bucket IAM"
 
@@ -182,6 +192,12 @@ function bucket_iam_destroy() {
 }
 
 function bucket_mount() {
+	set +u
+	if [[ -z "${KDEV_BUCKET_TYPE}" ]]; then
+		return
+	fi
+	set -u
+
 	echo
 	echo "==> mounting bucket"
 	# FIXME:
@@ -191,6 +207,12 @@ function bucket_mount() {
 }
 
 function bucket_destroy() {
+	set +u
+	if [[ -z "${KDEV_BUCKET_TYPE}" ]]; then
+		return
+	fi
+	set -u
+
 	echo
 	echo "==> deleting bucket"
 	set +e
