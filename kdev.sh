@@ -12,8 +12,8 @@ KDEV_NAME="kdev-${USER}-${PROFILE}"
 KDEV_NAMESPACE="${KDEV_NAME}"
 
 function main() {
-	if [[ $# -eq 0 ]]; then
-		echo "usage: $0 <profile> [command]"
+	if [[ $# -ne 2 ]]; then
+		echo "usage: $0 <profile> <command>"
 		echo
 		echo "profiles:"
 		echo
@@ -34,35 +34,44 @@ function main() {
 	profile_check
 	profile_read
 
-	# FIXME: warn about deleting data!
-	set +u
-	if [[ $2 == "destroy" ]]; then
-		set -u
+	case $2 in
+	setup)
+		pre_hook
+		bucket_create
+		manifests_template
+		manifests_apply
+		bucket_iam_create
+		pod_init
+		bucket_mount
+		;;
+
+	connect)
+		pod_fast_connect_if_exists
+		pre_hook
+		bucket_create
+		manifests_template
+		manifests_apply
+		bucket_iam_create
+		pod_init
+		bucket_mount
+		pod_connect
+		;;
+
+	destroy)
 		bucket_iam_destroy
 		manifests_destroy
 		exit
-	fi
-	set -u
+		;;
 
-	set +u
-	if [[ $2 == "destroy-data" ]]; then
-		set -u
-		echo "==> destroying data"
+	# FIXME: warn about deleting data!
+	destroy-data)
 		bucket_destroy
-		exit
-	fi
-	set -u
-
-	pod_fast_connect_if_exists
-
-	pre_hook
-	bucket_create
-	manifests_template
-	manifests_apply
-	bucket_iam_create
-	pod_init
-	bucket_mount
-	pod_connect
+		;;
+	*)
+		echo "Error: unknown command: $2"
+		exit 1
+		;;
+	esac
 }
 
 function pod_fast_connect_if_exists() {
