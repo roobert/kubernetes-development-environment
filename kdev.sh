@@ -38,10 +38,10 @@ function main() {
 	set +u
 	if [[ $2 == "destroy" ]]; then
 		set -u
+		echo
 		echo "==> destroying resources"
-		pod_destroy
-		bucket_iam_destroy
 		manifests_destroy
+		bucket_iam_destroy
 		exit
 	fi
 	set -u
@@ -62,7 +62,6 @@ function main() {
 	manifests_template
 	manifests_apply
 	bucket_iam_create
-	pod_create
 	pod_init
 	bucket_mount
 	pod_connect
@@ -168,20 +167,25 @@ function bucket_iam_destroy() {
 	echo
 	echo "==> destroying bucket IAM"
 
+	# FIXME: check state
+	gcloud projects remove-iam-policy-binding \
+		"${BUCKET_PROJECT}" \
+		--member="serviceAccount:${KDEV_NAME}@${BUCKET_PROJECT}.iam.gserviceaccount.com" \
+		--role='roles/storage.Admin'
+
 	# FIXME: check if already exists
 	gcloud iam service-accounts delete \
 		"${KDEV_NAME}@${BUCKET_PROJECT}.iam.gserviceaccount.com" \
-		--project="${BUCKET_PROJECT}" \
-		--quiet
+		--project="${BUCKET_PROJECT}"
 }
 
 function bucket_mount() {
 	echo
 	echo "==> mounting bucket"
-	#kubectl exec -it --namespace="${KDEV_NAME}" "${KDEV_NAME}" -- \
-	#	gcsfuse --implicit-dirs "${KDEV_NAME}" "/mnt/${KDEV_NAME}"
+	# FIXME:
+	# * remove flag when this issue is fixed: https://github.com/GoogleCloudPlatform/gcsfuse/issues/985
 	kubectl exec -it --namespace="${KDEV_NAME}" "${KDEV_NAME}" -- \
-		/bin/bash -c "mkdir -p /mnt/${KDEV_NAME} && gcsfuse --implicit-dirs ${KDEV_NAME} /mnt/${KDEV_NAME}"
+		/bin/bash -c "mkdir -p /mnt/${KDEV_NAME} && gcsfuse --enable-storage-client-library=false ${KDEV_NAME} /mnt/${KDEV_NAME}"
 }
 
 function bucket_destroy() {
@@ -210,6 +214,9 @@ function manifests_apply() {
 	echo
 	echo "==> applying manifests"
 	for manifest in "./tmp/${KDEV_NAME}"/*.yaml; do
+		if [[ $(basename "${manifest}") = "*_pod.yaml" ]]; then
+			continue
+		fi
 		echo
 		echo "processing: ${manifest}"
 		kubectl apply -f "${manifest}"
@@ -236,43 +243,6 @@ function manifests_destroy() {
 		kubectl delete -f "${manifest}"
 		set -e
 	done
-}
-
-# create a container if it doesn't exist
-function pod_create() {
-	echo
-	echo "==> creating pod"
-
-	set +e
-	POD_READY=$(kubectl get pods --namespace="${KDEV_NAME}" "${KDEV_NAME}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null)
-	set -e
-
-	# permit overriding default image
-	KDEV_IMAGE="${KDEV_IMAGE:-ubuntu}"
-
-	if [[ "${POD_READY}" != true ]]; then
-		# overrides required to allow service account use and by gcsfuse
-		kubectl run \
-			--namespace="${KDEV_NAME}" \
-			--overrides='{ "spec": { "template": {"spec": {"containers": [{"securityContext": {"privileged": true, "capabilities": {"add": ["SYS_ADMIN", "SYS_MODULE"]}}}]}}, "serviceAccount": "'"${KDEV_NAME}"'"}}' \
-			--image "${KDEV_IMAGE}" \
-			"${KDEV_NAME}" \
-			-- /bin/bash -c "tail -f /dev/null"
-
-		# FIXME: max wait 5 seconds?
-		echo -n "Waiting for pod to be ready.."
-		POD_READY=false
-		while [[ "${POD_READY}" != true ]]; do
-			echo -n "."
-			sleep 1
-			set +e
-			POD_READY=$(kubectl get pods --namespace="${KDEV_NAME}" "${KDEV_NAME}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null)
-			set -e
-		done
-		echo
-	else
-		echo "pod already exists.."
-	fi
 }
 
 function pod_init() {
@@ -309,14 +279,6 @@ function pod_connect() {
 	echo
 	echo "==> disconnected from pod"
 	echo
-}
-
-function pod_destroy() {
-	echo
-	echo "==> destroying pod"
-	set +e
-	kubectl delete pod --namespace="${KDEV_NAME}" "${KDEV_NAME}"
-	set -e
 }
 
 main "$@"
