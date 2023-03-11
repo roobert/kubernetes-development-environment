@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: KDEV_NAME
-  namespace: NAMESPACE
+  namespace: KDEV_NAMESPACE
 spec:
   serviceAccountName: KDEV_NAME
   serviceAccount: KDEV_NAME

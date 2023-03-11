@@ -9,7 +9,7 @@ PROFILE="${1}"
 set -u
 
 KDEV_NAME="kdev-${USER}-${PROFILE}"
-NAMESPACE="${KDEV_NAME}"
+KDEV_NAMESPACE="${KDEV_NAME}"
 
 function main() {
 	if [[ $# -eq 0 ]]; then
@@ -103,32 +103,32 @@ function bucket_create() {
 	echo "==> creating bucket"
 
 	set +u
-	if [[ -z "${BUCKET_TYPE}" ]]; then
-		echo "BUCKET_TYPE not set, skipping bucket creation"
+	if [[ -z "${KDEV_BUCKET_TYPE}" ]]; then
+		echo "KDEV_BUCKET_TYPE not set, skipping bucket creation"
 		set -u
 		return
 	fi
 
-	if [[ "${BUCKET_TYPE}" == "aws" ]] || [[ "${BUCKET_TYPE}" == "AWS" ]]; then
-		echo "BUCKET_TYPE: ${BUCKET_TYPE} not yet supported"
+	if [[ "${KDEV_BUCKET_TYPE}" == "aws" ]] || [[ "${KDEV_BUCKET_TYPE}" == "AWS" ]]; then
+		echo "KDEV_BUCKET_TYPE: ${KDEV_BUCKET_TYPE} not yet supported"
 		set -u
 		return
 	fi
 
-	if [[ -z "${BUCKET_LOCATION}" ]]; then
-		echo "Error: BUCKET_LOCATION not set in profile config: ./profiles/${PROFILE}/config.sh"
+	if [[ -z "${KDEV_BUCKET_LOCATION}" ]]; then
+		echo "Error: KDEV_BUCKET_LOCATION not set in profile config: ./profiles/${PROFILE}/config.sh"
 		exit 1
 	fi
 
-	if [[ -z "${BUCKET_PROJECT}" ]]; then
-		echo "Error: BUCKET_PROJECT not set in profile config: ./profiles/${PROFILE}/config.sh"
+	if [[ -z "${KDEV_BUCKET_PROJECT}" ]]; then
+		echo "Error: KDEV_BUCKET_PROJECT not set in profile config: ./profiles/${PROFILE}/config.sh"
 		exit 1
 	fi
 	set -u
 
 	# create a bucket to store our data in
-	if ! gsutil ls -p "${BUCKET_PROJECT}" "gs://${KDEV_NAME}" 2>/dev/null; then
-		gsutil mb -p "${BUCKET_PROJECT}" -c regional -l "${BUCKET_LOCATION}" "gs://${KDEV_NAME}"
+	if ! gsutil ls -p "${KDEV_BUCKET_PROJECT}" "gs://${KDEV_NAME}" 2>/dev/null; then
+		gsutil mb -p "${KDEV_BUCKET_PROJECT}" -c regional -l "${KDEV_BUCKET_LOCATION}" "gs://${KDEV_NAME}"
 	else
 		echo "bucket already exists.."
 	fi
@@ -140,25 +140,25 @@ function bucket_iam_create() {
 
 	# FIXME: check if already exists
 	gcloud iam service-accounts create "${KDEV_NAME}" \
-		--project="${BUCKET_PROJECT}"
+		--project="${KDEV_BUCKET_PROJECT}"
 
 	# FIXME: check if already exists
-	gcloud projects add-iam-policy-binding "${BUCKET_PROJECT}" \
-		--project "${BUCKET_PROJECT}" \
-		--member "serviceAccount:${KDEV_NAME}@${BUCKET_PROJECT}.iam.gserviceaccount.com" \
+	gcloud projects add-iam-policy-binding "${KDEV_BUCKET_PROJECT}" \
+		--project "${KDEV_BUCKET_PROJECT}" \
+		--member "serviceAccount:${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com" \
 		--role "roles/storage.admin"
 
 	# FIXME: check if already exists
 	gcloud iam service-accounts add-iam-policy-binding \
-		--project "${BUCKET_PROJECT}" \
-		"${KDEV_NAME}@${BUCKET_PROJECT}.iam.gserviceaccount.com" \
+		--project "${KDEV_BUCKET_PROJECT}" \
+		"${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com" \
 		--role roles/iam.workloadIdentityUser \
-		--member "serviceAccount:${BUCKET_PROJECT}.svc.id.goog[${NAMESPACE}/${KDEV_NAME}]"
+		--member "serviceAccount:${KDEV_BUCKET_PROJECT}.svc.id.goog[${KDEV_NAMESPACE}/${KDEV_NAME}]"
 
 	# FIXME: check if already exists
 	kubectl annotate serviceaccount "${KDEV_NAME}" \
-		--namespace "${NAMESPACE}" \
-		"iam.gke.io/gcp-service-account=${KDEV_NAME}@${BUCKET_PROJECT}.iam.gserviceaccount.com"
+		--namespace "${KDEV_NAMESPACE}" \
+		"iam.gke.io/gcp-service-account=${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com"
 }
 
 function bucket_iam_destroy() {
@@ -167,15 +167,15 @@ function bucket_iam_destroy() {
 
 	# FIXME: check state
 	gcloud projects remove-iam-policy-binding \
-		"${BUCKET_PROJECT}" \
-		--project="${BUCKET_PROJECT}" \
-		--member="serviceAccount:${KDEV_NAME}@${BUCKET_PROJECT}.iam.gserviceaccount.com" \
+		"${KDEV_BUCKET_PROJECT}" \
+		--project="${KDEV_BUCKET_PROJECT}" \
+		--member="serviceAccount:${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com" \
 		--role='roles/storage.admin'
 
 	# FIXME: check if already exists
 	gcloud iam service-accounts delete \
-		"${KDEV_NAME}@${BUCKET_PROJECT}.iam.gserviceaccount.com" \
-		--project="${BUCKET_PROJECT}" \
+		"${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com" \
+		--project="${KDEV_BUCKET_PROJECT}" \
 		--quiet
 }
 
@@ -206,7 +206,7 @@ function manifests_template() {
 		echo
 		echo "templating: ${manifest}"
 		FILENAME=$(basename "${manifest}")
-		sed "s/KDEV_NAME/${KDEV_NAME}/g;s/NAMESPACE/${NAMESPACE}/g" "${manifest}" >"./tmp/${KDEV_NAME}/${FILENAME}"
+		sed "s/KDEV_NAME/${KDEV_NAME}/g;s/KDEV_NAMESPACE/${KDEV_NAMESPACE}/g" "${manifest}" >"./tmp/${KDEV_NAME}/${FILENAME}"
 	done
 }
 
@@ -233,7 +233,7 @@ function manifests_destroy() {
 		echo
 		echo "templating: ${manifest}"
 		FILENAME=$(basename "${manifest}")
-		sed "s/KDEV_NAME/${KDEV_NAME}/g;s/NAMESPACE/${NAMESPACE}/g" "${manifest}" >"./tmp/${KDEV_NAME}/${FILENAME}"
+		sed "s/KDEV_NAME/${KDEV_NAME}/g;s/KDEV_NAMESPACE/${KDEV_NAMESPACE}/g" "${manifest}" >"./tmp/${KDEV_NAME}/${FILENAME}"
 	done
 
 	for manifest in $(ls -r ./tmp/"${KDEV_NAME}"/*.yaml); do
