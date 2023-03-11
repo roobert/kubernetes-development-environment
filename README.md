@@ -1,6 +1,6 @@
 # kdev - The Kubernetes Development Environment
 
-Ever wished you had a development environment within a cluster with persistent storage? Say hello to kdev!
+Ever wish you had a development environment within a cluster with persistent storage? Say hello to kdev!
 
 ## About
 
