@@ -236,12 +236,10 @@ function bucket_iam_create() {
 		--role roles/iam.workloadIdentityUser \
 		--member "serviceAccount:${KDEV_BUCKET_PROJECT}.svc.id.goog[${KDEV_NAMESPACE}/${MEMBER_SERVICE_ACCOUNT}]"
 
-	#if [[ -z "${KDEV_EXISTING_SERVICE_ACCOUNT}" ]]; then
 	# FIXME: check if already exists
 	kubectl annotate serviceaccount "${MEMBER_SERVICE_ACCOUNT}" \
 		--namespace "${KDEV_NAMESPACE}" \
 		"iam.gke.io/gcp-service-account=${SERVICE_ACCOUNT}"
-	#fi
 }
 
 function bucket_iam_destroy() {
