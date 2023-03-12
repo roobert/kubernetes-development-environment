@@ -40,3 +40,5 @@ cp -R dotfiles-master/* /root/
 shopt -u dotglob
 
 rm -rf dotfiles.zip dotfiles-master
+
+sed -i "s/^PS1='/PS1='(k8s) /g" .zsh/robs/prompt.zsh
