@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
-ROOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+ROOT_DIR="${SCRIPT_DIR}/.."
 PROFILES_DIR="${SCRIPT_DIR}/../profiles"
 
 set -euo pipefail
@@ -87,26 +87,31 @@ function usage() {
 	echo
 	echo "usage:"
 	echo
-	echo "  $(basename "$0") <profile> <command>"
+	echo "  $(basename "$0") <profile|command> [sub-command]"
 	echo
 	echo "profiles:"
 	echo
 	for profile in "${PROFILES_DIR}"/*; do
 		echo "  $(basename "${profile}")"
 	done
-	echo
 	echo "commands:"
+	echo
+	echo "  list         - detect and list active profiles for current cluster"
+	echo "  help         - show this help"
+	echo
+	echo "sub-commands:"
 	echo
 	echo "  setup        - configure but don't connect"
 	echo "  connect      - setup (if required) and connect (default command if none specified)"
 	echo "  destroy      - destroy all resources relating to the profile, apart from data bucket"
 	echo "  destroy-data - destroy the data bucket and all data!"
 	echo
-	echo "  help         - show this help"
 	echo
 	exit 1
 }
 
+# FIXME:
+# * workout how to detect active profiles in non-prefixed namespaces
 function list() {
 	echo "==> listing kdev namespaces"
 	kubectl get namespaces | awk '{ print $1 }' | grep -E '^kdev-*'
@@ -155,7 +160,7 @@ function bucket_create() {
 
 	echo
 	echo "==> creating bucket"
-	if [[ "${KDEV_BUCKET_TYPE}" == "aws" ]] || [[ "${KDEV_BUCKET_TYPE}" == "AWS" ]]; then
+	if [[ ${KDEV_BUCKET_TYPE} == aws ]] || [[ ${KDEV_BUCKET_TYPE} == AWS ]]; then
 		echo "KDEV_BUCKET_TYPE: ${KDEV_BUCKET_TYPE} not yet supported"
 		set -u
 		return
@@ -173,7 +178,7 @@ function bucket_create() {
 	set -u
 
 	# create a bucket to store our data in
-	if ! gsutil ls -p "${KDEV_BUCKET_PROJECT}" "gs://${KDEV_NAME}" 2>/dev/null; then
+	if ! gsutil ls -p "${KDEV_BUCKET_PROJECT}" "gs://${KDEV_NAME}" >/dev/null 2>&1; then
 		gsutil mb -p "${KDEV_BUCKET_PROJECT}" -c regional -l "${KDEV_BUCKET_LOCATION}" "gs://${KDEV_NAME}"
 	else
 		echo "bucket already exists.."
@@ -277,7 +282,7 @@ function manifests_template() {
 
 	for manifest in "${PROFILE_DIR}"/manifests/*.yaml; do
 		echo
-		echo "templating: ${manifest}"
+		echo "-> templating: ${manifest}"
 		FILENAME=$(basename "${manifest}")
 		sed "s/KDEV_NAMESPACE/${KDEV_NAMESPACE}/g;s/KDEV_NAME/${KDEV_NAME}/g" "${manifest}" >"${MANIFEST_DIR}/${FILENAME}"
 	done
@@ -287,11 +292,8 @@ function manifests_apply() {
 	echo
 	echo "==> applying manifests"
 	for manifest in "${MANIFEST_DIR}"/*.yaml; do
-		if [[ $(basename "${manifest}") = "*_pod.yaml" ]]; then
-			continue
-		fi
 		echo
-		echo "processing: ${manifest}"
+		echo "-> processing: ${manifest}"
 		kubectl apply -f "${manifest}"
 	done
 }
@@ -304,7 +306,7 @@ function manifests_destroy() {
 
 	for manifest in "${PROFILE_DIR}"/manifests/*.yaml; do
 		echo
-		echo "templating: ${manifest}"
+		echo "-> templating: ${manifest}"
 		FILENAME=$(basename "${manifest}")
 		sed "s/KDEV_NAMESPACE/${KDEV_NAMESPACE}/g;s/KDEV_NAME/${KDEV_NAME}/g" "${manifest}" >"${MANIFEST_DIR}/${FILENAME}"
 	done
@@ -312,7 +314,7 @@ function manifests_destroy() {
 	# NOTE: reversed list
 	for manifest in $(ls -r "${MANIFEST_DIR}"/*.yaml); do
 		echo
-		echo "processing: ${manifest}"
+		echo "-> processing: ${manifest}"
 		set +e
 		kubectl delete -f "${manifest}"
 		set -e
@@ -336,7 +338,7 @@ function pod_init() {
 	fi
 
 	if test -f "${PROFILE_DIR}/init.sh"; then
-		kubectl exec \
+		time kubectl exec \
 			-i \
 			--namespace="${KDEV_NAME}" \
 			"${KDEV_NAME}" -- /bin/bash <"${PROFILE_DIR}/init.sh"
@@ -349,11 +351,14 @@ function pod_connect() {
 
 	KDEV_SHELL="${KDEV_SHELL:-/bin/bash}"
 
-	kubectl exec -it --namespace="${KDEV_NAME}" "${KDEV_NAME}" -- "${KDEV_SHELL}"
+	kubectl exec \
+		-it \
+		--namespace="${KDEV_NAME}" \
+		"${KDEV_NAME}" -- "${KDEV_SHELL}"
 
 	echo
 	echo "==> disconnected from pod"
 	echo
 }
 
-main "$@"
+main $@
