@@ -19,7 +19,7 @@ apt-get -y install gcsfuse google-cloud-sdk software-properties-common git
 # Install Neovim
 add-apt-repository -y ppa:neovim-ppa/unstable
 apt-get update
-apt-get -y install neovim unzip zsh
+apt-get -y install neovim unzip zsh npm
 
 cd /root
 
@@ -42,3 +42,5 @@ shopt -u dotglob
 rm -rf dotfiles.zip dotfiles-master
 
 sed -i "s/^PS1='/PS1='(k8s) /g" .zsh/robs/prompt.zsh
+
+pip install flake8 codespell black isort
