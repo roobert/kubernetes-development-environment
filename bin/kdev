@@ -149,10 +149,12 @@ function profile_check() {
 function profile_read() {
 	echo "==> reading profile config"
 	source "${PROFILE_DIR}/config.sh"
+	set +u
 	KDEV_NAMESPACE="${KDEV_NAMESPACE:-$KDEV_NAME}"
 	SERVICE_ACCOUNT="${KDEV_EXISTING_SERVICE_ACCOUNT:-${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com}"
 	echo "namespace: ${KDEV_NAMESPACE}"
 	echo "service account: ${SERVICE_ACCOUNT}"
+	set +u
 }
 
 function bucket_create() {
@@ -162,6 +164,7 @@ function bucket_create() {
 	fi
 	set -u
 
+	set +u
 	echo
 	echo "==> creating bucket"
 	if [[ ${KDEV_BUCKET_TYPE} == aws ]] || [[ ${KDEV_BUCKET_TYPE} == AWS ]]; then
@@ -170,12 +173,17 @@ function bucket_create() {
 		return
 	fi
 
+	set +u
 	if [[ -z "${KDEV_BUCKET_LOCATION}" ]]; then
+		set -u
 		echo "Error: KDEV_BUCKET_LOCATION not set in profile config: ${PROFILE_DIR}/config.sh"
 		exit 1
 	fi
+	set -u
 
+	set +u
 	if [[ -z "${KDEV_BUCKET_PROJECT}" ]]; then
+		set -u
 		echo "Error: KDEV_BUCKET_PROJECT not set in profile config: ${PROFILE_DIR}/config.sh"
 		exit 1
 	fi
@@ -221,13 +229,13 @@ function bucket_iam_create() {
 
 	# FIXME:
 	# * this is probably not correct in all circumstances..
-	set -u
+	set +u
 	if [[ -z "${KDEV_EXISTING_SERVICE_ACCOUNT}" ]]; then
 		MEMBER_SERVICE_ACCOUNT="${KDEV_NAME}"
 	else
 		MEMBER_SERVICE_ACCOUNT="default"
 	fi
-	set +u
+	set -u
 
 	# FIXME: check if already exists
 	gcloud iam service-accounts add-iam-policy-binding \
@@ -254,13 +262,13 @@ function bucket_iam_destroy() {
 
 	# FIXME:
 	# * this is probably not correct in all circumstances..
-	set -u
+	set +u
 	if [[ -z "${KDEV_EXISTING_SERVICE_ACCOUNT}" ]]; then
 		MEMBER_SERVICE_ACCOUNT="${KDEV_NAME}"
 	else
 		MEMBER_SERVICE_ACCOUNT="default"
 	fi
-	set +u
+	set -u
 
 	# the hyphen at the end of the annotation means "remove"
 	set +e
