@@ -1,3 +1,6 @@
 KDEV_BUCKET_TYPE="gcp"
-KDEV_BUCKET_PROJECT="example-bucket"
+KDEV_BUCKET_PROJECT="example-project"
 KDEV_BUCKET_LOCATION="europe-west2"
+KDEV_NAMESPACE="default"
+KDEV_EXISTING_SERVICE_ACCOUNT="<gcp-project-number>-compute@developer.gserviceaccount.com"
+KDEV_SHELL="/usr/bin/zsh"
