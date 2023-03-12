@@ -150,6 +150,9 @@ function profile_read() {
 	echo "==> reading profile config"
 	source "${PROFILE_DIR}/config.sh"
 	KDEV_NAMESPACE="${KDEV_NAMESPACE:-$KDEV_NAME}"
+	SERVICE_ACCOUNT="${KDEV_EXISTING_SERVICE_ACCOUNT:-${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com}"
+	echo "namespace: ${KDEV_NAMESPACE}"
+	echo "service account: ${SERVICE_ACCOUNT}"
 }
 
 function bucket_create() {
@@ -199,8 +202,6 @@ function bucket_iam_create() {
 	echo
 	echo "==> setting up bucket IAM"
 
-	SERVICE_ACCOUNT="${KDEV_EXISTING_SERVICE_ACCOUNT:-${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com}"
-
 	if [[ ! -z "${KDEV_EXISTING_SERVICE_ACCOUNT}" ]]; then
 		echo "using default service account: ${KDEV_EXISTING_SERVICE_ACCOUNT}"
 	else
@@ -215,19 +216,27 @@ function bucket_iam_create() {
 		--member "serviceAccount:${SERVICE_ACCOUNT}" \
 		--role "roles/storage.admin"
 
+	# FIXME:
+	# * this is probably not correct in all circumstances..
+	if [[ -z "${KDEV_EXISTING_SERVICE_ACCOUNT}" ]]; then
+		MEMBER_SERVICE_ACCOUNT="${KDEV_NAME}"
+	else
+		MEMBER_SERVICE_ACCOUNT="default"
+	fi
+
 	# FIXME: check if already exists
 	gcloud iam service-accounts add-iam-policy-binding \
 		--project "${KDEV_BUCKET_PROJECT}" \
 		"${SERVICE_ACCOUNT}" \
 		--role roles/iam.workloadIdentityUser \
-		--member "serviceAccount:${KDEV_BUCKET_PROJECT}.svc.id.goog[${KDEV_NAMESPACE}/${KDEV_NAME}]"
+		--member "serviceAccount:${KDEV_BUCKET_PROJECT}.svc.id.goog[${KDEV_NAMESPACE}/${MEMBER_SERVICE_ACCOUNT}]"
 
-	if [[ -z "${KDEV_EXISTING_SERVICE_ACCOUNT}" ]]; then
-		# FIXME: check if already exists
-		kubectl annotate serviceaccount "${KDEV_NAME}" \
-			--namespace "${KDEV_NAMESPACE}" \
-			"iam.gke.io/gcp-service-account=${SERVICE_ACCOUNT}"
-	fi
+	#if [[ -z "${KDEV_EXISTING_SERVICE_ACCOUNT}" ]]; then
+	# FIXME: check if already exists
+	kubectl annotate serviceaccount "${MEMBER_SERVICE_ACCOUNT}" \
+		--namespace "${KDEV_NAMESPACE}" \
+		"iam.gke.io/gcp-service-account=${SERVICE_ACCOUNT}"
+	#fi
 }
 
 function bucket_iam_destroy() {
@@ -239,8 +248,6 @@ function bucket_iam_destroy() {
 
 	echo
 	echo "==> destroying bucket IAM"
-
-	SERVICE_ACCOUNT="${KDEV_SERVICE_ACCOUNT:-${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com}"
 
 	set +e
 	# FIXME: check state
