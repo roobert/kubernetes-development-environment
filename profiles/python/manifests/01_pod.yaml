@@ -4,8 +4,6 @@ metadata:
   name: KDEV_NAME
   namespace: KDEV_NAMESPACE
 spec:
-  serviceAccountName: KDEV_NAME
-  serviceAccount: KDEV_NAME
   restartPolicy: Never
   containers:
   - name: KDEV_NAME

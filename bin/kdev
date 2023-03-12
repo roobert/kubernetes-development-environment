@@ -14,7 +14,6 @@ PROFILE_DIR="${PROFILES_DIR}/${PROFILE}"
 set -u
 
 KDEV_NAME="kdev-${USER}-${PROFILE}"
-KDEV_NAMESPACE="${KDEV_NAME}"
 MANIFEST_DIR="${ROOT_DIR}/tmp/${KDEV_NAME}"
 
 function main() {
@@ -123,13 +122,14 @@ function pod_fast_connect_if_exists() {
 	echo "==> checking if pod exists"
 
 	set +e
-	POD_READY=$(kubectl get pods --namespace="${KDEV_NAME}" "${KDEV_NAME}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null)
+	POD_READY=$(kubectl get pods --namespace="${KDEV_NAMESPACE}" "${KDEV_NAME}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null)
 	set -e
 
 	if [[ "${POD_READY}" == true ]]; then
 		pod_connect
 		exit
 	fi
+	echo "no ready pod detected.."
 }
 
 function pre_hook() {
@@ -149,6 +149,7 @@ function profile_check() {
 function profile_read() {
 	echo "==> reading profile config"
 	source "${PROFILE_DIR}/config.sh"
+	KDEV_NAMESPACE="${KDEV_NAMESPACE:-$KDEV_NAME}"
 }
 
 function bucket_create() {
@@ -185,6 +186,9 @@ function bucket_create() {
 	fi
 }
 
+# FIXME:
+# * improve this to distinguish between kubernetes service accounts and
+#   the default gcp service account
 function bucket_iam_create() {
 	set +u
 	if [[ -z "${KDEV_BUCKET_TYPE}" ]]; then
@@ -195,27 +199,35 @@ function bucket_iam_create() {
 	echo
 	echo "==> setting up bucket IAM"
 
-	# FIXME: check if already exists
-	gcloud iam service-accounts create "${KDEV_NAME}" \
-		--project="${KDEV_BUCKET_PROJECT}"
+	SERVICE_ACCOUNT="${KDEV_EXISTING_SERVICE_ACCOUNT:-${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com}"
+
+	if [[ ! -z "${KDEV_EXISTING_SERVICE_ACCOUNT}" ]]; then
+		echo "using default service account: ${KDEV_EXISTING_SERVICE_ACCOUNT}"
+	else
+		# FIXME: check if already exists
+		gcloud iam service-accounts create "${KDEV_NAME}" \
+			--project="${KDEV_BUCKET_PROJECT}"
+	fi
 
 	# FIXME: check if already exists
 	gcloud projects add-iam-policy-binding "${KDEV_BUCKET_PROJECT}" \
 		--project "${KDEV_BUCKET_PROJECT}" \
-		--member "serviceAccount:${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com" \
+		--member "serviceAccount:${SERVICE_ACCOUNT}" \
 		--role "roles/storage.admin"
 
 	# FIXME: check if already exists
 	gcloud iam service-accounts add-iam-policy-binding \
 		--project "${KDEV_BUCKET_PROJECT}" \
-		"${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com" \
+		"${SERVICE_ACCOUNT}" \
 		--role roles/iam.workloadIdentityUser \
 		--member "serviceAccount:${KDEV_BUCKET_PROJECT}.svc.id.goog[${KDEV_NAMESPACE}/${KDEV_NAME}]"
 
-	# FIXME: check if already exists
-	kubectl annotate serviceaccount "${KDEV_NAME}" \
-		--namespace "${KDEV_NAMESPACE}" \
-		"iam.gke.io/gcp-service-account=${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com"
+	if [[ -z "${KDEV_EXISTING_SERVICE_ACCOUNT}" ]]; then
+		# FIXME: check if already exists
+		kubectl annotate serviceaccount "${KDEV_NAME}" \
+			--namespace "${KDEV_NAMESPACE}" \
+			"iam.gke.io/gcp-service-account=${SERVICE_ACCOUNT}"
+	fi
 }
 
 function bucket_iam_destroy() {
@@ -228,19 +240,23 @@ function bucket_iam_destroy() {
 	echo
 	echo "==> destroying bucket IAM"
 
+	SERVICE_ACCOUNT="${KDEV_SERVICE_ACCOUNT:-${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com}"
+
 	set +e
 	# FIXME: check state
 	gcloud projects remove-iam-policy-binding \
 		"${KDEV_BUCKET_PROJECT}" \
 		--project="${KDEV_BUCKET_PROJECT}" \
-		--member="serviceAccount:${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com" \
+		--member="serviceAccount:${SERVICE_ACCOUNT}" \
 		--role='roles/storage.admin'
 
-	# FIXME: check if already exists
-	gcloud iam service-accounts delete \
-		"${KDEV_NAME}@${KDEV_BUCKET_PROJECT}.iam.gserviceaccount.com" \
-		--project="${KDEV_BUCKET_PROJECT}" \
-		--quiet
+	if [[ -z "${KDEV_EXISTING_SERVICE_ACCOUNT}" ]]; then
+		# FIXME: check if already exists
+		gcloud iam service-accounts delete \
+			"${SERVICE_ACCOUNT}" \
+			--project="${KDEV_BUCKET_PROJECT}" \
+			--quiet
+	fi
 	set -e
 }
 
@@ -255,7 +271,7 @@ function bucket_mount() {
 	echo "==> mounting bucket"
 	# FIXME:
 	# * remove flag when this issue is fixed: https://github.com/GoogleCloudPlatform/gcsfuse/issues/985
-	kubectl exec -it --namespace="${KDEV_NAME}" "${KDEV_NAME}" -- \
+	kubectl exec -it --namespace="${KDEV_NAMESPACE}" "${KDEV_NAME}" -- \
 		/bin/bash -c "mkdir -p /mnt/${KDEV_NAME} && gcsfuse --enable-storage-client-library=false ${KDEV_NAME} /mnt/${KDEV_NAME}"
 }
 
@@ -278,6 +294,7 @@ function bucket_destroy() {
 function manifests_template() {
 	echo
 	echo "==> templating manifests"
+	rm -rf "${MANIFEST_DIR}"
 	mkdir -p "${MANIFEST_DIR}"
 
 	for manifest in "${PROFILE_DIR}"/manifests/*.yaml; do
@@ -302,6 +319,7 @@ function manifests_destroy() {
 	echo
 	echo "==> destroying manifests"
 
+	rm -rf "${MANIFEST_DIR}"
 	mkdir -p "${MANIFEST_DIR}"
 
 	for manifest in "${PROFILE_DIR}"/manifests/*.yaml; do
@@ -326,7 +344,7 @@ function pod_init() {
 	echo "==> initialize pod"
 
 	set +e
-	POD_READY=$(kubectl get pods --namespace="${KDEV_NAME}" "${KDEV_NAME}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null)
+	POD_READY=$(kubectl get pods --namespace="${KDEV_NAMESPACE}" "${KDEV_NAME}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null)
 	set -e
 
 	# permit overriding default image
@@ -340,7 +358,7 @@ function pod_init() {
 	if test -f "${PROFILE_DIR}/init.sh"; then
 		time kubectl exec \
 			-i \
-			--namespace="${KDEV_NAME}" \
+			--namespace="${KDEV_NAMESPACE}" \
 			"${KDEV_NAME}" -- /bin/bash <"${PROFILE_DIR}/init.sh"
 	fi
 }
@@ -353,7 +371,7 @@ function pod_connect() {
 
 	kubectl exec \
 		-it \
-		--namespace="${KDEV_NAME}" \
+		--namespace="${KDEV_NAMESPACE}" \
 		"${KDEV_NAME}" -- "${KDEV_SHELL}"
 
 	echo
@@ -361,4 +379,4 @@ function pod_connect() {
 	echo
 }
 
-main $@
+main $*
