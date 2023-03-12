@@ -202,13 +202,16 @@ function bucket_iam_create() {
 	echo
 	echo "==> setting up bucket IAM"
 
+	set +u
 	if [[ ! -z "${KDEV_EXISTING_SERVICE_ACCOUNT}" ]]; then
 		echo "using default service account: ${KDEV_EXISTING_SERVICE_ACCOUNT}"
 	else
+		set -u
 		# FIXME: check if already exists
 		gcloud iam service-accounts create "${KDEV_NAME}" \
 			--project="${KDEV_BUCKET_PROJECT}"
 	fi
+	set -u
 
 	# FIXME: check if already exists
 	gcloud projects add-iam-policy-binding "${KDEV_BUCKET_PROJECT}" \
@@ -218,11 +221,13 @@ function bucket_iam_create() {
 
 	# FIXME:
 	# * this is probably not correct in all circumstances..
+	set -u
 	if [[ -z "${KDEV_EXISTING_SERVICE_ACCOUNT}" ]]; then
 		MEMBER_SERVICE_ACCOUNT="${KDEV_NAME}"
 	else
 		MEMBER_SERVICE_ACCOUNT="default"
 	fi
+	set +u
 
 	# FIXME: check if already exists
 	gcloud iam service-accounts add-iam-policy-binding \
@@ -249,21 +254,43 @@ function bucket_iam_destroy() {
 	echo
 	echo "==> destroying bucket IAM"
 
+	# FIXME:
+	# * this is probably not correct in all circumstances..
+	set -u
+	if [[ -z "${KDEV_EXISTING_SERVICE_ACCOUNT}" ]]; then
+		MEMBER_SERVICE_ACCOUNT="${KDEV_NAME}"
+	else
+		MEMBER_SERVICE_ACCOUNT="default"
+	fi
+	set +u
+
+	# the hyphen at the end of the annotation means "remove"
 	set +e
+	kubectl annotate serviceaccount "${MEMBER_SERVICE_ACCOUNT}" \
+		--namespace "${KDEV_NAMESPACE}" \
+		"iam.gke.io/gcp-service-account-"
+	set -e
+
 	# FIXME: check state
+	set +e
 	gcloud projects remove-iam-policy-binding \
 		"${KDEV_BUCKET_PROJECT}" \
 		--project="${KDEV_BUCKET_PROJECT}" \
 		--member="serviceAccount:${SERVICE_ACCOUNT}" \
 		--role='roles/storage.admin'
+	set -e
 
+	set +u
 	if [[ -z "${KDEV_EXISTING_SERVICE_ACCOUNT}" ]]; then
+		set -u
+		set +e
 		# FIXME: check if already exists
 		gcloud iam service-accounts delete \
 			"${SERVICE_ACCOUNT}" \
 			--project="${KDEV_BUCKET_PROJECT}" \
 			--quiet
 	fi
+	set -u
 	set -e
 }
 
