@@ -2,8 +2,8 @@
 
 A profile based development environment within a cluster with persistent storage.
 
-## Usage
 
+## Install
 ```
 # Install
 mkdir -p "${HOME}/opt"
@@ -15,6 +15,19 @@ export PATH="$PATH:$HOME/opt/kubernetes-development-environment/bin"
 
 kdev help
 ```
+
+## Usage
+
+1. Make a copy of one of the existing profiles
+2. Edit the `init.sh` script to run the post-boot commands
+3. Edit the manifests in the `manifests` directory to configure any resources required
+   for the pod - this could include services accounts, role bindings, etc.
+4. Edit `config.sh` and configure the environment variables
+
+Note that due to the ephemeral and immutable nature of containers, if a pod is restarted for any reason (node
+upgrade, etc.) then the filesystem will be reset and all changes lost, including changes
+made by `init.sh`. For this reason the examples configure the pods with a `restartPolicy` of `never` to act as a signal
+that a pod is no-longer configured.
 
 ## About
 
