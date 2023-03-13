@@ -29,6 +29,14 @@ upgrade, etc.) then the filesystem will be reset and all changes lost, including
 made by `init.sh`. For this reason the examples configure the pods with a `restartPolicy` of `never` to act as a signal
 that a pod is no-longer configured.
 
+## Example Notes
+
+The simplest example is the `python` profile which launches a pod in the default
+namespace using the default compute service account.
+
+A more complex example is the `neovim` profile which sets up a custom service account
+with some role bindings to give the pod access to some of the kubernetes APIs.
+
 ## About
 
 * **Customizable environment**
